@@ -1,130 +1,106 @@
-from django.contrib import messages
-from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, ListView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-from .forms import HotspotUserForm, RouterForm, VoucherForm
-from .models import HotspotUser, RouterDevice, Voucher
-from .routeros import RouterOSClient
-from .serializers import HotspotUserSerializer, RouterDeviceSerializer, VoucherSerializer
+from routeros_api import RouterOsApiPool
+from routeros_api.exceptions import RouterOsApiError
 
 
-def dashboard(request):
-    routers = RouterDevice.objects.count()
-    users = HotspotUser.objects.count()
-    vouchers = Voucher.objects.count()
-    return render(request, "dashboard.html", {"routers": routers, "users": users, "vouchers": vouchers})
+class RouterOSClient:
+    def __init__(self, router):
+        self.router = router
 
+    def connect(self):
+        pool = RouterOsApiPool(
+            username=self.router.username,
+            password=self.router.password,
+            host=self.router.host,
+            port=self.router.port,
+            use_ssl=self.router.use_ssl,
+        )
+        return pool.get_api()
 
-class RouterListView(ListView):
-    model = RouterDevice
-    template_name = "routers.html"
-    context_object_name = "routers"
-
-
-class RouterCreateView(CreateView):
-    model = RouterDevice
-    form_class = RouterForm
-    template_name = "router_form.html"
-    success_url = reverse_lazy("router-list")
-
-
-class HotspotUserListView(ListView):
-    model = HotspotUser
-    template_name = "users.html"
-    context_object_name = "users"
-
-
-class HotspotUserCreateView(CreateView):
-    model = HotspotUser
-    form_class = HotspotUserForm
-    template_name = "user_form.html"
-    success_url = reverse_lazy("user-list")
-
-    def form_valid(self, form):
-        obj = form.save(commit=False)
-        router = obj.router
-        client = RouterOSClient(router)
+    def test_connection(self):
+        api = self.connect()
         try:
-            client.add_hotspot_user(obj.username, obj.password, profile=obj.profile, comment=obj.comment)
-            messages.success(self.request, "Hotspot user created successfully.")
-        except Exception as exc:
-            messages.error(self.request, str(exc))
-            return redirect("user-list")
-        obj.save()
-        return super().form_valid(form)
+            api(cmd='/system/resource/print')
+            return True
+        except RouterOsApiError as exc:
+            raise Exception(f'RouterOS connection failed: {exc}') from exc
+        finally:
+            api.close()
 
-
-class VoucherCreateView(CreateView):
-    model = Voucher
-    form_class = VoucherForm
-    template_name = "voucher_form.html"
-    success_url = reverse_lazy("voucher-form")
-
-    def form_valid(self, form):
-        messages.success(self.request, f"Voucher {form.cleaned_data['code']} created successfully.")
-        return super().form_valid(form)
-
-
-def toggle_user_status(request, pk):
-    user = HotspotUser.objects.get(pk=pk)
-    client = RouterOSClient(user.router)
-    if user.disabled:
-        client.enable_hotspot_user(user.username)
-        user.disabled = False
-    else:
-        client.disable_hotspot_user(user.username)
-        user.disabled = True
-    user.save()
-    messages.success(request, "User status updated.")
-    return redirect("user-list")
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def api_router_list(request):
-    routers = RouterDevice.objects.all()
-    serializer = RouterDeviceSerializer(routers, many=True)
-    return Response(serializer.data)
-
-
-@api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
-def api_user_list(request):
-    if request.method == "GET":
-        users = HotspotUser.objects.all()
-        serializer = HotspotUserSerializer(users, many=True)
-        return Response(serializer.data)
-
-    serializer = HotspotUserSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def api_voucher_list(request):
-    vouchers = Voucher.objects.all()
-    serializer = VoucherSerializer(vouchers, many=True)
-    return Response(serializer.data)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def api_active_sessions(request):
-    routers = RouterDevice.objects.filter(is_active=True)
-    active_sessions = []
-    for router in routers:
+    def list_hotspot_users(self):
+        api = self.connect()
         try:
-            client = RouterOSClient(router)
-            sessions = client.get_active_sessions()
-            for item in sessions:
-                active_sessions.append({"router": router.name, "session": item})
-        except Exception:
-            continue
-    return Response(active_sessions)
+            return api(cmd='/ip/hotspot/user/print')
+        except RouterOsApiError as exc:
+            raise Exception(f'RouterOS error: {exc}') from exc
+        finally:
+            api.close()
+
+    def add_hotspot_user(self, username, password, profile='default', comment=''):
+        api = self.connect()
+        try:
+            api(cmd='/ip/hotspot/user/add', name=username, password=password, profile=profile, comment=comment)
+            return True
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to add user: {exc}') from exc
+        finally:
+            api.close()
+
+    def disable_hotspot_user(self, username):
+        api = self.connect()
+        try:
+            user = self._find_user_by_name(api, username)
+            if user:
+                api(cmd='/ip/hotspot/user/set', numbers=user['.id'], disabled='true')
+            return True
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to disable user: {exc}') from exc
+        finally:
+            api.close()
+
+    def enable_hotspot_user(self, username):
+        api = self.connect()
+        try:
+            user = self._find_user_by_name(api, username)
+            if user:
+                api(cmd='/ip/hotspot/user/set', numbers=user['.id'], disabled='false')
+            return True
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to enable user: {exc}') from exc
+        finally:
+            api.close()
+
+    def remove_hotspot_user(self, username):
+        api = self.connect()
+        try:
+            user = self._find_user_by_name(api, username)
+            if user:
+                api(cmd='/ip/hotspot/user/remove', numbers=user['.id'])
+            return True
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to remove user: {exc}') from exc
+        finally:
+            api.close()
+
+    def _find_user_by_name(self, api, username):
+        users = api(cmd='/ip/hotspot/user/print', where=f'name={username}')
+        if users:
+            return users[0]
+        return None
+
+    def get_active_sessions(self):
+        api = self.connect()
+        try:
+            return api(cmd='/ip/hotspot/active/print')
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to fetch active sessions: {exc}') from exc
+        finally:
+            api.close()
+
+    def get_hotspot_profiles(self):
+        api = self.connect()
+        try:
+            return api(cmd='/ip/hotspot/user/profile/print')
+        except RouterOsApiError as exc:
+            raise Exception(f'Failed to fetch hotspot profiles: {exc}') from exc
+        finally:
+            api.close()

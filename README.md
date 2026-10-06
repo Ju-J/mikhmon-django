@@ -1,27 +1,44 @@
-# Mikhmon Django
+body {
+  background: #f4f7fb;
+  font-family: Arial, Helvetica, sans-serif;
+}
 
-A Django-based MikroTik Hotspot management server inspired by Mikhmon.
+.card-stat {
+  background: white;
+  border-radius: 18px;
+  padding: 1.8rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  min-height: 150px;
+}
 
-## Features
-- RouterOS API integration
-- Router device management
-- Hotspot user management
-- Voucher generation
-- Active session monitoring
-- REST API endpoints
+.card-stat small {
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 
-## Quick start
+.card-stat h2 {
+  margin-top: 0.8rem;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
 
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
+.card {
+  border: none;
+  border-radius: 18px;
+}
 
-Then open http://127.0.0.1:8000/
+.table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6c757d;
+}
 
-## Notes
-This project is a strong starting point and is designed to be extended for production deployment, including authentication, advanced reporting, and integration with real MikroTik RouterOS environments.
+.btn {
+  border-radius: 10px;
+}
+
+input, select, textarea {
+  border-radius: 10px !important;
+}

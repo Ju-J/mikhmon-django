@@ -1,12 +1,47 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card shadow-sm p-4">
-    <h3>Add Hotspot User</h3>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Save User</button>
-    </form>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Hotspot Users</h3>
+    <a href="{% url 'user-new' %}" class="btn btn-primary">Add User</a>
+</div>
+
+<div class="card shadow-sm p-3">
+    <table class="table table-striped align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Router</th>
+                <th>Username</th>
+                <th>Profile</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.router.name }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.profile }}</td>
+                <td>
+                    {% if user.disabled %}
+                        <span class="badge bg-warning text-dark">Disabled</span>
+                    {% else %}
+                        <span class="badge bg-success">Enabled</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'user-toggle' user.id %}" class="btn btn-sm {% if user.disabled %}btn-success{% else %}btn-warning{% endif %}">
+                        {% if user.disabled %}Enable{% else %}Disable{% endif %}
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">No hotspot users found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endblock %}

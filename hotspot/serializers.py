@@ -1,20 +1,29 @@
-from rest_framework import serializers
-from .models import HotspotUser, RouterDevice, Voucher
+from django import forms
+from .models import HotspotProfile, HotspotUser, RouterDevice, Voucher
 
 
-class RouterDeviceSerializer(serializers.ModelSerializer):
+class RouterForm(forms.ModelForm):
     class Meta:
         model = RouterDevice
-        fields = "__all__"
+        fields = ['name', 'host', 'port', 'username', 'password', 'use_ssl', 'is_active']
+        widgets = {'password': forms.PasswordInput(render_value=True)}
 
 
-class HotspotUserSerializer(serializers.ModelSerializer):
+class HotspotProfileForm(forms.ModelForm):
+    class Meta:
+        model = HotspotProfile
+        fields = ['router', 'name', 'rate_limit', 'session_timeout', 'idle_timeout']
+
+
+class HotspotUserForm(forms.ModelForm):
     class Meta:
         model = HotspotUser
-        fields = "__all__"
+        fields = ['router', 'username', 'password', 'profile', 'server', 'comment', 'disabled']
+        widgets = {'password': forms.PasswordInput(render_value=True)}
 
 
-class VoucherSerializer(serializers.ModelSerializer):
+class VoucherForm(forms.ModelForm):
     class Meta:
         model = Voucher
-        fields = "__all__"
+        fields = ['router', 'code', 'profile', 'valid_days', 'status', 'expires_at']
+        widgets = {'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local'})}
