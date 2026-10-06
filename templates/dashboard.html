@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card-stat">
+            <small>Routers</small>
+            <h2>{{ routers }}</h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-stat">
+            <small>Hotspot Users</small>
+            <h2>{{ users }}</h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-stat">
+            <small>Vouchers</small>
+            <h2>{{ vouchers }}</h2>
+        </div>
+    </div>
+</div>
+{% endblock %}
